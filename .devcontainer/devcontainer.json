@@ -1,0 +1,20 @@
+{
+	"name": "TorchRL",
+	"dockerComposeFile": [
+		"../docker/compose.yaml"
+	],
+	"service": "torchrl",
+
+	"workspaceFolder": "/home/dexter/programming/",
+    "shutdownAction": "stopCompose",
+	 
+	"customizations": {
+		"vscode": {
+			"settings": { },
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance"
+			]
+		}
+	}
+}
