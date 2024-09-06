@@ -56,7 +56,7 @@ class IRB1402FGripperInterface:
         
     def step(self, actions : np.ndarray):
         """
-            actions should be of len == 7
+            actions should be of len == 8
             [dx, dy, dz], [x,y,z,w], gripper
         """
         gripper_action = np.clip(actions[-1], 0., 1.)
