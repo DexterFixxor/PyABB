@@ -31,7 +31,7 @@ class IRB140Interface(BaseJointInterface):
     def calculateDrectKinematics(self, q : np.ndarray):
         """
             Computes forward kinematics for given joint positions. 
-            Returns position vector, and quaternion in (x,y,z,s)
+            Returns position vector, and quaternion in (x,y,z,w)
         """
         return self._ik_solver._foward(q)
         

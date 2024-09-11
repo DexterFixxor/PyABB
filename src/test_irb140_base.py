@@ -56,30 +56,30 @@ if __name__ == "__main__":
     
     
     
-    client = bc.BulletClient(connection_mode=pb.GUI)
+    client = bc.BulletClient(connection_mode=pb.DIRECT)
     
     client.setAdditionalSearchPath(pybullet_data.getDataPath())
     client.loadURDF("plane100.urdf", useMaximalCoordinates=True)
     client.setGravity(0, 0, -9.81)
     
     
-    cube_id = client.loadURDF('cube_small.urdf', useMaximalCoordinates=True, )
-    client.resetBasePositionAndOrientation(cube_id, [0.712, 0, 0.026], [0, 0, 0, 1])
+    # cube_id = client.loadURDF('cube_small.urdf', useMaximalCoordinates=True, )
+    # client.resetBasePositionAndOrientation(cube_id, [0.712, 0, 0.026], [0, 0, 0, 1])
 
-    client.changeDynamics(
-        bodyUniqueId = cube_id,
-        linkIndex = -1, 
-        mass = 0.2,
-        lateralFriction = 1,
-        spinningFriction = 0.1,
-        rollingFriction = 0.1,
-        restitution = 0,
-        linearDamping = 0.4,
-        angularDamping = 0.4,
-        contactStiffness = 1000,
-        contactDamping = 1,
-        frictionAnchor = False,        
-    )
+    # client.changeDynamics(
+    #     bodyUniqueId = cube_id,
+    #     linkIndex = -1, 
+    #     mass = 0.2,
+    #     lateralFriction = 1,
+    #     spinningFriction = 0.1,
+    #     rollingFriction = 0.1,
+    #     restitution = 0,
+    #     linearDamping = 0.4,
+    #     angularDamping = 0.4,
+    #     contactStiffness = 1000,
+    #     contactDamping = 1,
+    #     frictionAnchor = False,        
+    # )
     
     
     robot = IRB1402FGripperInterface(client)
@@ -127,14 +127,14 @@ if __name__ == "__main__":
     input_dims = 7
     n_actions = 8
     agent = ddpg.Agent(alpha=0.001, beta = 0.001, input_dims=input_dims, tau = 0.005,
-                       n_actions= n_actions, layer1_size= 400, layer2_size=300, batch_size=256)
+                       n_actions= n_actions, layer1_size= 128, layer2_size=128, batch_size=256)
     
     num_of_episodes = 20000
     scores = []
     test_scores = []
     for index in range(num_of_episodes):
       
-        goal = *target_pos, *target_rot
+        goal = np.concatenate([np.array(target_pos).flatten(), np.array(target_rot).flatten()])
         proximity = 0.15
         time_step = 0
         states = []
@@ -144,7 +144,7 @@ if __name__ == "__main__":
         
         robot._robotInterface.reset()
         robot._update_states()
-        state = *robot._ee_position, *robot._ee_orientation
+        state = np.concatenate([robot._ee_position, robot._ee_orientation])
         score = 0
         
         while time_step < 200:
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             robot.step(action)
             robot._update_states()
             #next_state = robot._ee_position, robot._ee_orientation, robot._gripper_state
-            next_state = *robot._ee_position, *robot._ee_orientation
+            next_state = np.concatenate([robot._ee_position, robot._ee_orientation])
             
             
             
@@ -228,18 +228,24 @@ if __name__ == "__main__":
         scores.append(score)
         #---------------Memory loading -------------------#
         rem_goal = states[-1]
-        for t in range(time_step):
+        #for t in range(time_step):
             #real_reward = reward_func(states[t], goal)
             #agent.memory.real_buffer.append(states[t],actions[t], real_reward, next_states[t], dones[t])
-            
-            rem_reward = reward_func(states[t],rem_goal, proximity)
-            agent.memory.rem_buffer.append(states[t],actions[t], rem_reward, next_states[t], dones[t])
+        state_ids = np.array(range(time_step))
+
+        states = np.array(states)
+        actions = np.array(actions)
+        next_states = np.array(next_states)
+        dones = np.array(dones)
+        
+        rem_reward = reward_func(states[state_ids],rem_goal, proximity)
+        agent.memory.rem_buffer.append(states[state_ids],actions[state_ids], rem_reward, next_states[state_ids], dones[state_ids])
             
         #score = sum(agent.memory.real_buffer.reward_memory[-100:])
         
         
         #---------------Learning -------------------#
-        if len(agent.memory.real_buffer.state_memory) > 20000:
+        if len(agent.memory.real_buffer.state_memory) > 512:
             for i in range(100):
                 batch = agent.memory.sample()
                 agent.learn(batch)

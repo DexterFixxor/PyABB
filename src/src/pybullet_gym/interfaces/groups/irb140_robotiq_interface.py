@@ -63,8 +63,8 @@ class IRB1402FGripperInterface:
         
         delta_pos = actions[:3] * self._dt
         
-        delta_rot = actions[3:6]
-        delta_rot = self._ee_orientation * np.append(delta_rot, 0.0) * self._dt
+        delta_rot = actions[3:7]
+        delta_rot = self._ee_orientation * delta_rot * self._dt
         delta_rot = delta_rot / 2
         
         

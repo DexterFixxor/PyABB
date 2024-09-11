@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from collections import deque, namedtuple
 import random
 
+
 CHECKPOINT_DIR_PATH = "/home/viktor/Documents/DIPLOMSKI/reinforcement learning/RL_Exercises_1/models/ddpg"
 
 class ReplayBuffer(object):
@@ -25,25 +26,32 @@ class ReplayBuffer(object):
         #self.goal_memory = deque([],self.max_len)
         
     def append(self,state,action,reward,next_state, done):
-        self.state_memory.append(state)
-        self.next_state_memory.append(next_state)
-        self.action_memory.append(action)
-        self.reward_memory.append(reward)
-        self.done_memory.append(done)
+        if len(state.shape) == 1:
+            self.state_memory.append(state)
+            self.next_state_memory.append(next_state)
+            self.action_memory.append(action)
+            self.reward_memory.append(reward)
+            self.done_memory.append(done)
+        else:
+            self.state_memory.extend(state)
+            self.next_state_memory.extend(next_state)
+            self.action_memory.extend(action)
+            self.reward_memory.extend(reward)
+            self.done_memory.extend(done)
         #self.goal_memory.append(goal)
         
     def sample(self):
         max_memory = len(self.state_memory)
         
-        batch = random.sample(range(max_memory), self.batch_size)
+        batch = np.array(random.sample(range(max_memory), self.batch_size), dtype=np.int32)
         #print(batch)
         #print(self.state_memory)
-        states = [self.state_memory[i] for i in batch]
-        next_states = [self.next_state_memory[i] for i in batch]
-        actions = [self.action_memory[i] for i in batch]
-        rewards = [self.reward_memory[i] for i in batch]
-        dones = [self.done_memory[i] for i in batch]
-        #goals = [self.goal_memory[i] for i in batch]
+        states = np.array(self.state_memory)[batch.astype(int)]
+        next_states = np.array(self.next_state_memory)[batch.astype(int)]#[self.next_state_memory[i] for i in batch]
+        actions = np.array(self.action_memory)[batch.astype(int)]#[self.actions_memory[i] for i in batch]
+        rewards = np.array(self.reward_memory)[batch.astype(int)]#[self.reward_memory[i] for i in batch]
+        dones = np.array(self.done_memory)[batch.astype(int)]#[self.done_memory[i] for i in batch]
+        #goals = self.goal_memory[batch]#[self.goal_memory[i] for i in batch]
         
         return states, actions, rewards, next_states, dones  #, goals
 

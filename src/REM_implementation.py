@@ -27,12 +27,12 @@ class Buffer(object):
     def sample(self):
         max_memory = len(self.state_memory)
         batch = random.sample(range(max_memory), self.batch_size)
-        states = [self.state_memory[i] for i in batch]
-        next_states = [self.next_state_memory[i] for i in batch]
-        actions = [self.actions_memory[i] for i in batch]
-        rewards = [self.reward_memory[i] for i in batch]
-        dones = [self.done_memory[i] for i in batch]
-        goals = [self.goal_memory[i] for i in batch]
+        states = self.state_memory[batch]#[self.state_memory[i] for i in batch]
+        next_states = self.next_state_memory[batch]#[self.next_state_memory[i] for i in batch]
+        actions = self.actions_memory[batch]#[self.actions_memory[i] for i in batch]
+        rewards = self.reward_memory[batch]#[self.reward_memory[i] for i in batch]
+        dones = self.done_memory[batch]#[self.done_memory[i] for i in batch]
+        goals = self.goal_memory[batch]#[self.goal_memory[i] for i in batch]
         
         return states, actions, rewards, next_states, dones, goals
         
@@ -57,15 +57,7 @@ class REPLAY_BUFFER(object):
             return self.real_buffer.sample()
         
 def reward_func(state, goal, epsilon = .2):
-    
-    x,y,z = state[:3]
-    goal_x, goal_y, goal_z = goal[:3]
-    
-    distance = math.sqrt((x- goal_x)**2 + (y- goal_y)**2 +(z- goal_z)**2)
-    
-    if distance < epsilon:
-        return 0
-    
-    
-    
-    return -1
+    state = np.array(state)
+    goal = np.array(goal)
+    distance = np.linalg.norm(goal-state, axis = -1)
+    return (distance < epsilon) - 1
