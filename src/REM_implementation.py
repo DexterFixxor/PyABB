@@ -3,6 +3,7 @@ import random
 import torch
 from collections import deque
 import math
+import time
 
 class Buffer(object):
     def __init__(self, max_len,batch_size):
@@ -14,6 +15,8 @@ class Buffer(object):
         self.actions_memory = deque([],self.max_len)
         self.next_state_memory = deque([],self.max_len)
         self.done_memory = deque([],self.max_len)
+        print("RADI Buffer")
+        time.sleep(100)
         
     def append(self, state, action, reward, next_state, done, goal):
         self.state_memory.append(state)
@@ -46,7 +49,8 @@ class REPLAY_BUFFER(object):
         self.k = k
         self.rem_buffer = Buffer(buffer_length,self.batch_size)
         self.real_buffer = Buffer(buffer_length,self.batch_size)
-        
+        print("RADI REPLAY_BUFFER REM")
+        time.sleep(100)
         
     def sample(self):
         epsilon = random.random()

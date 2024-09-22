@@ -11,7 +11,7 @@ class IRB1402FGripperInterface:
     def __init__(self, client : BulletClient):
         
         self._client = client
-        self._urdf_path = 'urdfs/abb_irb140/irb140_robotiq.urdf' 
+        self._urdf_path = 'src/urdfs/abb_irb140/irb140_robotiq.urdf' 
         self._body_id = self._client.loadURDF(self._urdf_path)
         
         self._dt = 1./240.
@@ -56,20 +56,22 @@ class IRB1402FGripperInterface:
         
     def step(self, actions : np.ndarray):
         """
-            actions should be of len == 8
+            actions should be of len == 7
             [dx, dy, dz], [x,y,z,w], gripper
         """
         gripper_action = np.clip(actions[-1], 0., 1.)
         
         delta_pos = actions[:3] * self._dt
         
-        delta_rot = actions[3:7]
-        delta_rot = self._ee_orientation * delta_rot * self._dt
+        delta_rot = actions[3:6]
+        delta_rot = self._ee_orientation * np.append(delta_rot, 0.0) * self._dt
         delta_rot = delta_rot / 2
         
         
         new_pos = self._ee_position + delta_pos
         new_rot = delta_rot / qnorm(delta_rot)
+        
+        
         
         self._set_ee_pose(new_pos, new_rot)
                         

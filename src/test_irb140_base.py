@@ -8,6 +8,10 @@ import ddpg
 import math
 from REM_implementation import reward_func
 import random
+from buffer import HERBuffer
+
+from src.pybullet_gym.envs.irb_env import IRBReachEnv
+
 
 
 from src.pybullet_gym.interfaces.robots.irb140interface import IRB140Interface
@@ -50,36 +54,36 @@ def test():
     return score
 
 
-
-          
 if __name__ == "__main__":
     
+    client = bc.BulletClient(connection_mode=pb.GUI)
+    env = IRBReachEnv(client)
     
     
-    client = bc.BulletClient(connection_mode=pb.DIRECT)
     
+    """
     client.setAdditionalSearchPath(pybullet_data.getDataPath())
     client.loadURDF("plane100.urdf", useMaximalCoordinates=True)
     client.setGravity(0, 0, -9.81)
     
     
-    # cube_id = client.loadURDF('cube_small.urdf', useMaximalCoordinates=True, )
-    # client.resetBasePositionAndOrientation(cube_id, [0.712, 0, 0.026], [0, 0, 0, 1])
+    cube_id = client.loadURDF('cube_small.urdf', useMaximalCoordinates=True, )
+    client.resetBasePositionAndOrientation(cube_id, [0.712, 0, 0.026], [0, 0, 0, 1])
 
-    # client.changeDynamics(
-    #     bodyUniqueId = cube_id,
-    #     linkIndex = -1, 
-    #     mass = 0.2,
-    #     lateralFriction = 1,
-    #     spinningFriction = 0.1,
-    #     rollingFriction = 0.1,
-    #     restitution = 0,
-    #     linearDamping = 0.4,
-    #     angularDamping = 0.4,
-    #     contactStiffness = 1000,
-    #     contactDamping = 1,
-    #     frictionAnchor = False,        
-    # )
+    client.changeDynamics(
+        bodyUniqueId = cube_id,
+        linkIndex = -1, 
+        mass = 0.2,
+        lateralFriction = 1,
+        spinningFriction = 0.1,
+        rollingFriction = 0.1,
+        restitution = 0,
+        linearDamping = 0.4,
+        angularDamping = 0.4,
+        contactStiffness = 1000,
+        contactDamping = 1,
+        frictionAnchor = False,        
+    )
     
     
     robot = IRB1402FGripperInterface(client)
@@ -123,129 +127,65 @@ if __name__ == "__main__":
     
     open_len = 0.049
     angle = (0.715 - np.sin((open_len - 0.01)/0.1143)) / 0.14
-    
-    input_dims = 7
+    """
+    input_dims = 14
     n_actions = 8
+    memory_buffer = HERBuffer()
+    
     agent = ddpg.Agent(alpha=0.001, beta = 0.001, input_dims=input_dims, tau = 0.005,
-                       n_actions= n_actions, layer1_size= 128, layer2_size=128, batch_size=256)
+                       n_actions= n_actions,buffer= memory_buffer , layer1_size= 128, layer2_size=128, batch_size=256)
     
     num_of_episodes = 20000
     scores = []
     test_scores = []
+    
+    
     for index in range(num_of_episodes):
       
-        goal = np.concatenate([np.array(target_pos).flatten(), np.array(target_rot).flatten()])
-        proximity = 0.15
+       
         time_step = 0
-        states = []
-        actions = []
-        next_states = []
-        dones = []
+        state = env.reset() # vraca poz i orient ee i goal as numpy
+       
         
-        robot._robotInterface.reset()
-        robot._update_states()
-        state = np.concatenate([robot._ee_position, robot._ee_orientation])
         score = 0
-        
+        obs = np.concatenate([state,env.goal], axis=-1)
         while time_step < 200:
-            action = agent.choose_action(state,0)
-            
-            #print(action)
-            action = torch.Tensor.cpu(action).detach().numpy()
-            actions.append(action)
-            #print(action)
+            action = agent.choose_action(obs,0).numpy()
             
             action[-1] = 1
-            #print(action)
-            #time.sleep(123)
-            
-            
-            robot.step(action)
-            robot._update_states()
+           
+
+            transition = env.step(state,action)
+            transition = np.concatenate([state,action,transition],axis=0)
+            agent.memory.push(transition)
+            #robot.step(action)
+            #robot._update_states()
             #next_state = robot._ee_position, robot._ee_orientation, robot._gripper_state
-            next_state = np.concatenate([robot._ee_position, robot._ee_orientation])
-            
-            
-            
-            
-            """
-            robot._gripper_interface.setGripperAction(0.0)
-            if time.time() - start <3:
-                target_pos = np.array([0.7, 0, 0.1])
-                target_q = np.array([0, 0, 0, 1])
-            
-            elif time.time() - start > 3 and time.time() - start < 5:
-                target_pos = np.array([0.7, 0, 0.1])
-                target_q = np.array([0, 1, 0, 0])
-            
-            elif time.time() - start > 5 and time.time() - start < 7:
-                target_pos = np.array([0.7, -0.3, 0.1])
-                target_q = np.array([0, 1, 0, 0])
-            elif time.time() - start > 7 and time.time() - start < 9:
-                target_pos = np.array([0.7, 0.3, 0.1])
-                target_q = np.array([0, 1, 0, 0])    
-            """
-            """
-            if time.time() - start < 3:
-                robot._gripper_interface.setGripperAction(0)
-                robot._set_ee_pose(target_pos, target_q)
-            elif time.time() - start > 3 and time.time() - start < 5:
-                robot._gripper_interface.setGripperAction(0.65)
-            elif time.time() - start < 7:
-                target_pos[-1] = 0.3
-                robot._set_ee_pose(target_pos, target_q)
-                robot._gripper_interface.setGripperAction(0.65)
-            else:
-                target_pos[-1] = 0.1
-                robot._gripper_interface.setGripperAction(0.65)
-                robot._set_ee_pose(target_pos, target_q)
-            """
-            #robot._set_ee_pose(target_pos,target_q)
-            
-            for i in range(8):
-                client.stepSimulation()
-            
-            real_reward = reward_func(state, goal,proximity)
-            if real_reward == 0:
-                done = 1
-            else:
-                done = 0
-                
-            states.append(state)
-            
-            next_states.append(next_state)    
-            dones.append(done)
-            agent.memory.real_buffer.append(state,action, real_reward, next_state, done)
-            
-            score += real_reward
-            state = next_state
-            
-            time_step +=1
-            
+            #next_state = np.concatenate([robot._ee_position, robot._ee_orientation])
+        
             #time.sleep(0.1/240.0)
         #print(f"F: {1000/(time.time() - start)}")
-        dones[-1] = 1
-        scores.append(score)
+       
+       
+        scores.append(np.sum(agent.memory.rewards))
         #---------------Memory loading -------------------#
-        rem_goal = states[-1]
-        #for t in range(time_step):
-            #real_reward = reward_func(states[t], goal)
-            #agent.memory.real_buffer.append(states[t],actions[t], real_reward, next_states[t], dones[t])
+        rem_goal = agent.memory.states[-1]
         state_ids = np.array(range(time_step))
 
-        states = np.array(states)
-        actions = np.array(actions)
-        next_states = np.array(next_states)
-        dones = np.array(dones)
+        states = np.array(agent.memory.states)
+        actions = np.array(agent.memory.actions)
+        next_states = np.array(agent.memory.next_states)
+        dones = np.array(agent.memory.dones)
         
-        rem_reward = reward_func(states[state_ids],rem_goal, proximity)
-        agent.memory.rem_buffer.append(states[state_ids],actions[state_ids], rem_reward, next_states[state_ids], dones[state_ids])
+        rem_reward = reward_func(states[state_ids],rem_goal)
+        agent.memory.her_buffer.append(states[state_ids],actions[state_ids], rem_reward, 
+                                       next_states[state_ids], dones[state_ids],rem_goal)
             
         #score = sum(agent.memory.real_buffer.reward_memory[-100:])
         
         
         #---------------Learning -------------------#
-        if len(agent.memory.real_buffer.state_memory) > 512:
+        if len(agent.memory.buffer.state_memory) > 512:
             for i in range(100):
                 batch = agent.memory.sample()
                 agent.learn(batch)
@@ -265,7 +205,10 @@ if __name__ == "__main__":
             print("Test result: %.2f" %test_score, "Average test result: %.2f" %np.mean(test_scores[-100:]))
                 
             pass
-            
+        
+        
+        agent.memory.reset_episode()
+        time_step +=1
         
         #elif index >1500 and index <2000:
         #    target_pos = np.array([0.712, 0.4, 0.1])
