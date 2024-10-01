@@ -36,7 +36,7 @@ class HERBuffer():
         self.buffer.append(state, action, reward, next_state, done, goal)
         pass
 
-    def reset_episode(self, reward_function):
+    def reset_episode(self):
         
         self.states = []
         self.actions  = []
@@ -51,12 +51,15 @@ class HERBuffer():
     def sample(self):
         buffer_sample = self.buffer.sample()
         her_buffer_sample = self.her_buffer.sample()
-        return np.concatenate([buffer_sample, her_buffer_sample])
+        
+        
+      
+        return buffer_sample, her_buffer_sample
         # sample redovan buffer
         # sample HER buffer
         #torch.cat() axis = 0
         #np.concatenate
-        pass
+        
     
     
     
@@ -73,6 +76,7 @@ class ReplayBuffer(object):
         self.action_memory = deque([],self.mem_size)
         self.goal_memory = deque([],self.mem_size)
         
+        
     def append(self,state,action,reward,next_state, done,goal):
         if len(state.shape) == 1:
             self.state_memory.append(state)
@@ -87,8 +91,9 @@ class ReplayBuffer(object):
             self.action_memory.extend(action)
             self.reward_memory.extend(reward)
             self.done_memory.extend(done)
-            self.goal_memory.extend(goal)
-        
+            self.goal_memory.extend(goal*len(state)) ## zbog istog goal u funkciji append 
+                                                     #za her buffer mi ubaci samo jednom goal, 
+                                                     #pa ne bude odgovarajuće  dimenzije
         
     def sample(self):
         max_memory = len(self.state_memory)
@@ -102,5 +107,7 @@ class ReplayBuffer(object):
         rewards = np.array(self.reward_memory)[batch.astype(int)]#[self.reward_memory[i] for i in batch]
         dones = np.array(self.done_memory)[batch.astype(int)]#[self.done_memory[i] for i in batch]
         goals = np.array(self.goal_memory)[batch]#[self.goal_memory[i] for i in batch]
+        
+        
         
         return states, actions, rewards, next_states, dones, goals

@@ -22,34 +22,28 @@ import time
 import matplotlib.pyplot as plt
 
 
-def test():
+def test(env):
     
-    robot._robotInterface.reset()
-    robot._update_states()
-    state = *robot._ee_position, *robot._ee_orientation
+    
+    state = env.reset()
     score = 0
     time_step = 0
     agent.actor.eval()
+    obs = np.concatenate([state,env.goal], axis=-1)
     while time_step <200:
         
-        action = agent.choose_action(state,1)
-        action = torch.Tensor.cpu(action).detach().numpy()
-        
+        action = agent.choose_action(obs,1).detach().numpy()
         action[-1] = 1
         
-        robot.step(action)
-        robot._update_states()
-        #next_state = robot._ee_position, robot._ee_orientation, robot._gripper_state
-        next_state = *robot._ee_position, *robot._ee_orientation
-        for i in range(8):
-            client.stepSimulation()
-
-        score += reward_func(state, goal,proximity)
-        state = next_state
+        reward, done,next_state , goal = env.step(state,action)
         
-    
-    
+        
+        #agent.memory.push(state,action,reward, done,next_state, goal)
+        state = next_state
+        obs = np.concatenate([next_state,env.goal])
+        score += reward
         time_step +=1
+        
     agent.actor.train()
     return score
 
@@ -132,8 +126,8 @@ if __name__ == "__main__":
     n_actions = 8
     memory_buffer = HERBuffer()
     
-    agent = ddpg.Agent(alpha=0.001, beta = 0.001, input_dims=input_dims, tau = 0.005,
-                       n_actions= n_actions,buffer= memory_buffer , layer1_size= 128, layer2_size=128, batch_size=256)
+    agent = ddpg.Agent(alpha=0.001, beta = 0.001, input_dims=input_dims, tau = .01,
+                       n_actions= n_actions,buffer= memory_buffer , layer1_size= 256, layer2_size=256, batch_size=256)
     
     num_of_episodes = 20000
     scores = []
@@ -150,24 +144,23 @@ if __name__ == "__main__":
         score = 0
         obs = np.concatenate([state,env.goal], axis=-1)
         while time_step < 200:
-            action = agent.choose_action(obs,0).numpy()
-            
+            action = agent.choose_action(obs,0).detach().numpy()
             action[-1] = 1
-           
-
-            transition = env.step(state,action)
-            transition = np.concatenate([state,action,transition],axis=0)
-            agent.memory.push(transition)
-            #robot.step(action)
-            #robot._update_states()
-            #next_state = robot._ee_position, robot._ee_orientation, robot._gripper_state
-            #next_state = np.concatenate([robot._ee_position, robot._ee_orientation])
-        
+          
+            reward, done,next_state , goal = env.step(state,action)
+            
+            
+            agent.memory.push(state,action,reward, done,next_state, goal)
+            state = next_state
+            obs = np.concatenate([next_state,env.goal])
+            score += reward
+            time_step +=1
+            
             #time.sleep(0.1/240.0)
         #print(f"F: {1000/(time.time() - start)}")
        
        
-        scores.append(np.sum(agent.memory.rewards))
+        scores.append(score)
         #---------------Memory loading -------------------#
         rem_goal = agent.memory.states[-1]
         state_ids = np.array(range(time_step))
@@ -176,23 +169,26 @@ if __name__ == "__main__":
         actions = np.array(agent.memory.actions)
         next_states = np.array(agent.memory.next_states)
         dones = np.array(agent.memory.dones)
-        
+    
         rem_reward = reward_func(states[state_ids],rem_goal)
-        agent.memory.her_buffer.append(states[state_ids],actions[state_ids], rem_reward, 
-                                       next_states[state_ids], dones[state_ids],rem_goal)
+        rem_reward = np.reshape(rem_reward,(200,1))
+        
+        agent.memory.her_buffer.append(states[state_ids],actions[state_ids], rem_reward[state_ids], 
+                                       next_states[state_ids], dones[state_ids],[rem_goal])
             
         #score = sum(agent.memory.real_buffer.reward_memory[-100:])
         
         
         #---------------Learning -------------------#
-        if len(agent.memory.buffer.state_memory) > 512:
-            for i in range(100):
-                batch = agent.memory.sample()
-                agent.learn(batch)
+        if len(agent.memory.buffer.state_memory) > 20000:
+            for i in range(50):
+                buff_batch, her_buff_batch = agent.memory.sample()
+                agent.learn(buff_batch)
+                agent.learn(her_buff_batch)
                 #print("learning")
             
-        if index % 1000 ==0:
-            agent.epsilon = max(agent.epsilon-0.1, 0.01)
+        if index % 100 ==0 and index >= 100:
+            agent.epsilon = max(agent.epsilon-0.05, 0.01)
             
         print("Epizoda:", index, "score: %.2f" %score, "epsilon %.2f" %agent.epsilon,
               "average score: %.2f" %np.mean(scores[-100:]))
@@ -200,15 +196,15 @@ if __name__ == "__main__":
             proximity = 0.1
             
         if index %20 ==0:
-            test_score = test()
+            test_score = test(env)
             test_scores.append(test_score)
             print("Test result: %.2f" %test_score, "Average test result: %.2f" %np.mean(test_scores[-100:]))
                 
-            pass
+            
         
         
         agent.memory.reset_episode()
-        time_step +=1
+        
         
         #elif index >1500 and index <2000:
         #    target_pos = np.array([0.712, 0.4, 0.1])

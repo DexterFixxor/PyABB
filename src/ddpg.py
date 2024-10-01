@@ -155,7 +155,7 @@ class Agent(object):
             mu = torch.normal(mean= mu_v, std= var_v)
            
             noise = torch.distributions.Normal(0,0.1)
-            mu_prime = mu*2 + noise.sample().to(self.actor.device)
+            mu_prime = mu + noise.sample().to(self.actor.device)
           
         else:
             mu_prime = np.random.uniform(low = -1., high= 1., size=(8,))
@@ -178,33 +178,36 @@ class Agent(object):
         """
         self.learn_counter+= 1
         #state, action, reward, next_state, done = self.memory.sample(self.batch_size)
-        states, action, rewards, next_states, dones, goals = batch
+        states, actions, rewards, next_states, dones, goals = batch
         
         #print(action, type(action))
         
         
         states = torch.tensor(states, dtype= torch.float32).to(self.critic.device)
         #print(state, type(state))
-        action= torch.tensor(action, dtype= torch.float32).to(self.critic.device)
+        actions= torch.tensor(actions, dtype= torch.float32).to(self.critic.device)
         #action = action.squeeze()
         #print(action)
         #time.sleep(122)
-        rewards = torch.tensor(rewards, dtype= torch.float32).to(self.critic.device)
+        rewards = torch.tensor(rewards, dtype= torch.float32).to(self.critic.device).squeeze()
         next_states = torch.tensor(next_states, dtype= torch.float32).to(self.critic.device)
-        dones = torch.tensor(dones, dtype= torch.float32).to(self.critic.device)
+        dones = torch.tensor(dones, dtype= torch.float32).to(self.critic.device).squeeze()
+        dones[-1] = 1
         goals = torch.tensor(goals, dtype= torch.float32).to(self.critic.device)
         
-        mu, var = self.target_actor(torch.cat([next_states,goals],dim=1))
+        mu, var = self.target_actor(torch.cat([next_states,goals],dim=1))# da li treba next states ili states
         target_actions = torch.normal(mu, var)
-        #print("state----------",state.shape)
-        #print("action----------",action.shape,action)
-        critic_value = self.critic(states,action).squeeze()   
+        
+        obs = torch.cat([next_states,goals],dim=1)
+        
+        critic_value = self.critic(obs,actions).squeeze()   
         with torch.no_grad(): 
-            target_critic_next_value = self.target_critic(next_states,target_actions).squeeze()
+            target_critic_next_value = self.target_critic(obs,target_actions).squeeze()
             
             target_ = rewards + (self.gamma* target_critic_next_value*(1-dones))
-        #print(target_, len(target_))
-            target_ = torch.tensor(target_).to(self.critic.device)
+           
+            #target_ = torch.tensor(target_).to(self.critic.device)
+           # target_ = target_.clone()
         #target_ = target_.view(self.batch_size,1)
         
         #print(target_)
@@ -226,7 +229,7 @@ class Agent(object):
         
         #print("actions mean",mu.mean())
         #self.actor.train()
-        actor_loss = -self.critic(states, action).mean()
+        actor_loss = -self.critic(torch.cat([next_states,goals],dim=1), actions).mean()
         #actor_loss = torch.mean(actor_loss)
         #print("actor loss",actor_loss)
 
