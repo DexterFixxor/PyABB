@@ -57,7 +57,7 @@ class IRBReachEnv(gym.Env):
         next_state = np.concatenate([self.robot._ee_position, self.robot._ee_orientation])
         reward = self.reward(state)
         
-        done = np.array([0])
+        done = reward.copy()
         
         return reward, done, next_state, self.goal
         #return np.array of next_state, goal, reward, done
@@ -81,7 +81,7 @@ class IRBReachEnv(gym.Env):
         #self.client.removeUserDebugItem(self.point)
         #self.point = self.client.addUserDebugPoints(
         #pointPositions=[self.goal[:3]],
-       # pointColorsRGB = [[1.0, 1.0, 0.0]],
+        #pointColorsRGB = [[1.0, 1.0, 0.0]],
         #pointSize=10
         #)
         

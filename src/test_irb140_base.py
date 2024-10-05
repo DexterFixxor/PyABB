@@ -126,8 +126,8 @@ if __name__ == "__main__":
     n_actions = 8
     memory_buffer = HERBuffer()
     
-    agent = ddpg.Agent(alpha=0.001, beta = 0.001, input_dims=input_dims, tau = .01,
-                       n_actions= n_actions,buffer= memory_buffer , layer1_size= 256, layer2_size=256, batch_size=256)
+    agent = ddpg.Agent(lr_actor=0.001, lr_critic = 0.001, input_dims=input_dims, tau = .01,
+                       n_actions= n_actions,buffer= memory_buffer , layer1_size= 64, layer2_size=64, batch_size=128)
     
     num_of_episodes = 20000
     scores = []
@@ -195,7 +195,7 @@ if __name__ == "__main__":
         if  index > 15000 :
             proximity = 0.1
             
-        if index %20 ==0:
+        if index %20 ==1:
             test_score = test(env)
             test_scores.append(test_score)
             print("Test result: %.2f" %test_score, "Average test result: %.2f" %np.mean(test_scores[-100:]))

@@ -35,6 +35,11 @@ class CriticNetwork(nn.Module):
             nn.Linear(self.fc1_dims, self.fc2_dims),
             nn.ReLU()
         )
+        self.fc3 = nn.Sequential(
+            nn.Linear(self.fc2_dims, self.fc2_dims),
+            nn.ReLU()
+        )
+        
         
         self.action_value = nn.Linear(self.n_actions, self.fc2_dims)
         self.q = nn.Linear(self.fc2_dims, 1)
@@ -46,7 +51,7 @@ class CriticNetwork(nn.Module):
     def forward(self, state, action):
         x = self.fc1(state)
         x = self.fc2(x)
-       
+        x = self.fc3(x)
         action_value = self.action_value(action)
         state_action_value = F.relu(torch.add(x,action_value))
         state_action_value = self.q(state_action_value)
@@ -80,6 +85,10 @@ class ActorNetwork(nn.Module):
             nn.Linear(self.fc1_dims, self.fc2_dims),
             nn.ReLU()
         )
+        self.fc3 = nn.Sequential(
+            nn.Linear(self.fc2_dims, self.fc2_dims),
+            nn.ReLU()
+        )
       
         self.mu = nn.Sequential(
             nn.Linear(self.fc2_dims, self.n_actions),
@@ -100,6 +109,7 @@ class ActorNetwork(nn.Module):
         #x = self.bn1(x)
         #x = F.relu(x)
         x = self.fc2(x)
+        x = self.fc3(x)
         #x = self.bn2(x)
         #x = F.relu(x)
         mu = self.mu(x)
@@ -116,7 +126,7 @@ class ActorNetwork(nn.Module):
         self.load_state_dict(torch.load(self.checkpoint_file))
             
 class Agent(object):
-    def __init__(self, alpha, beta, input_dims, tau, n_actions,buffer, gamma = 0.99,
+    def __init__(self, lr_actor, lr_critic, input_dims, tau, n_actions,buffer, gamma = 0.99,
                  max_size = 1000000, layer1_size = 256, layer2_size = 256, batch_size = 256
                  ):
         self.gamma = gamma
@@ -127,13 +137,13 @@ class Agent(object):
         self.memory = buffer
         self.epsilon = 1.0
         self.epsilon_decay = 0.98
-        self.actor = ActorNetwork(alpha, input_dims, layer1_size, layer2_size,
+        self.actor = ActorNetwork(lr_actor, input_dims, layer1_size, layer2_size,
                                   n_actions=n_actions,name="Actor")
-        self.target_actor = ActorNetwork(alpha, input_dims, layer1_size, layer2_size,
+        self.target_actor = ActorNetwork(lr_actor, input_dims, layer1_size, layer2_size,
                                   n_actions=n_actions,name="Target_Actor")
-        self.critic = CriticNetwork(beta, input_dims, layer1_size, layer2_size,
+        self.critic = CriticNetwork(lr_critic, input_dims, layer1_size, layer2_size,
                                     n_actions=n_actions, name="Critic")
-        self.target_critic = CriticNetwork(beta, input_dims, layer1_size, layer2_size,
+        self.target_critic = CriticNetwork(lr_critic, input_dims, layer1_size, layer2_size,
                                     n_actions=n_actions, name="Target_Critic")
         
         self.update_network_parameters(tau=1)
