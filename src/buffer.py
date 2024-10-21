@@ -5,7 +5,7 @@ from collections import deque
 
 class HERBuffer():
 
-    def __init__(self, odnos = 0.5, batch_size = 256, buffer_len = int(1e6)):
+    def __init__(self, odnos = 0.5, batch_size = 128, buffer_len = int(1e6)):
 
         self.her_batch = int(odnos * batch_size)
         self.batch = int((1-odnos) * batch_size)
@@ -70,18 +70,18 @@ class ReplayBuffer(object):
         self.mem_size = max_size
         self.batch_size = batch_size
         self.counter = 0
-        # self.state_memory = deque([],maxlen=self.mem_size)
-        # self.next_state_memory = deque([],self.mem_size)
-        # self.reward_memory = deque([],self.mem_size)
-        # self.done_memory = deque([],self.mem_size)
-        # self.action_memory = deque([],self.mem_size)
-        # self.goal_memory = deque([],self.mem_size)
-        self.state_memory = []
-        self.next_state_memory = []
-        self.reward_memory = []
-        self.done_memory = []
-        self.action_memory = []
-        self.goal_memory = []
+        self.state_memory = deque([],maxlen=self.mem_size)
+        self.next_state_memory = deque([],self.mem_size)
+        self.reward_memory = deque([],self.mem_size)
+        self.done_memory = deque([],self.mem_size)
+        self.action_memory = deque([],self.mem_size)
+        self.goal_memory = deque([],self.mem_size)
+        # self.state_memory = []
+        # self.next_state_memory = []
+        # self.reward_memory = []
+        # self.done_memory = []
+        # self.action_memory = []
+        # self.goal_memory = []
         
         
         
@@ -93,6 +93,7 @@ class ReplayBuffer(object):
             self.reward_memory.append(reward)
             self.done_memory.append(done)
             self.goal_memory.append(goal)
+           
             
         else:
             self.state_memory.extend(state)
@@ -103,6 +104,7 @@ class ReplayBuffer(object):
             self.goal_memory.extend(goal*len(state)) ## zbog istog goal u funkciji append 
                                                      #za her buffer mi ubaci samo jednom goal, 
                                                      #pa ne bude odgovarajuće  dimenzije
+           
         
     def sample(self):
         max_memory = len(self.state_memory)

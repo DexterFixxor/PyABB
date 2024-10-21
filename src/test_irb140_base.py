@@ -9,6 +9,8 @@ import math
 from REM_implementation import reward_func
 import random
 from buffer import HERBuffer
+from tqdm import tqdm, trange
+
 
 from src.pybullet_gym.envs.irb_env import IRBReachEnv
 
@@ -29,18 +31,21 @@ def test(env):
     score = 0
     time_step = 0
     agent.actor.eval()
-    obs = np.concatenate([state,env.goal], axis=-1)
-    while time_step <200:
+    
+    while time_step <episode_length:
+        obs = np.concatenate([state,env.goal], axis=-1,dtype=np.float32)
         
-        action = agent.choose_action(obs,1).detach().numpy()
+        obs = torch.from_numpy(obs).to(agent.actor.device)
+        
+        mu_v,var_v = agent.target_actor(obs)
+        action = torch.distributions.Normal(loc= mu_v, scale= var_v).sample().detach().numpy()
         action[-1] = 1
         
         reward, done,next_state , goal = env.step(state,action)
         
         
-        #agent.memory.push(state,action,reward, done,next_state, goal)
+        
         state = next_state
-        obs = np.concatenate([next_state,env.goal])
         score += reward
         time_step +=1
         
@@ -122,80 +127,82 @@ if __name__ == "__main__":
     open_len = 0.049
     angle = (0.715 - np.sin((open_len - 0.01)/0.1143)) / 0.14
     """
-    input_dims = 14
+    input_dims_actor = 6
+    input_dims_critic = 6
     n_actions = 8
     memory_buffer = HERBuffer()
     
-    agent = ddpg.Agent(lr_actor=0.001, lr_critic = 0.001, input_dims=input_dims, tau = .01,
+    agent = ddpg.Agent(lr_actor=0.001, lr_critic = 0.001, input_dims_actor=input_dims_actor, input_dims_critic = input_dims_critic, tau = .05,
                        n_actions= n_actions,buffer= memory_buffer , layer1_size= 64, layer2_size=64, batch_size=128)
     
-    num_of_episodes = 20000
+    num_of_episodes = 100000
     scores = []
     test_scores = []
+    episode_length = 100
     
     
-    for index in range(num_of_episodes):
+    for index in trange(num_of_episodes):
       
        
         time_step = 0
         state = env.reset() # vraca poz i orient ee i goal as numpy
        
-        
+        done = 0
         score = 0
-        obs = np.concatenate([state,env.goal], axis=-1)
-        while time_step < 200:
+        
+        while time_step < episode_length and not done :
+            obs = np.concatenate([state,env.goal], axis=-1)
             action = agent.choose_action(obs,0).detach().numpy()
             action[-1] = 1
           
-            reward, done,next_state , goal = env.step(state,action)
-            
+            reward, done, next_state, goal = env.step(state,action)
             
             agent.memory.push(state,action,reward, done,next_state, goal)
             state = next_state
-            obs = np.concatenate([next_state,env.goal])
+            
             score += reward
             time_step +=1
             
-            #time.sleep(0.1/240.0)
-        #print(f"F: {1000/(time.time() - start)}")
-       
-       
+    
         scores.append(score)
+
         #---------------Memory loading -------------------#
-        rem_goal = agent.memory.states[-1]
+        her_goal = state
         state_ids = np.array(range(time_step))
 
         states = np.array(agent.memory.states)
         actions = np.array(agent.memory.actions)
         next_states = np.array(agent.memory.next_states)
-        dones = np.array(agent.memory.dones)
-    
-        rem_reward = reward_func(states[state_ids],rem_goal)
-        rem_reward = np.reshape(rem_reward,(200,1))
+     
+        #her_reward = reward_func(states[state_ids],her_goal)
+        her_reward = env.reward(states[state_ids],her_goal)
+        her_reward = np.reshape(her_reward,(time_step,1))
+        dones = her_reward.copy()
+        dones = np.add(dones,1)
         
-        agent.memory.her_buffer.append(states[state_ids],actions[state_ids], rem_reward[state_ids], 
-                                       next_states[state_ids], dones[state_ids],[rem_goal])
+        agent.memory.her_buffer.append(states[state_ids],actions[state_ids], her_reward[state_ids], 
+                                       next_states[state_ids], dones[state_ids],[her_goal])
             
-        #score = sum(agent.memory.real_buffer.reward_memory[-100:])
+        
         
         
         #---------------Learning -------------------#
-        if len(agent.memory.buffer.state_memory) > 20000:
+        if len(agent.memory.buffer.state_memory) > 6000:
             for i in range(50):
                 buff_batch, her_buff_batch = agent.memory.sample()
                 agent.learn(buff_batch)
                 agent.learn(her_buff_batch)
                 #print("learning")
             
-        if index % 100 ==0 and index >= 100:
-            agent.epsilon = max(agent.epsilon-0.05, 0.01)
+        if index % 50 ==0 and index >= 100:
+            agent.epsilon = max(agent.epsilon*agent.epsilon_decay, 0.01)
             
         print("Epizoda:", index, "score: %.2f" %score, "epsilon %.2f" %agent.epsilon,
               "average score: %.2f" %np.mean(scores[-100:]))
         if  index > 15000 :
             proximity = 0.1
             
-        if index %20 ==1:
+        if index %50 ==0 and index > 100:
             test_score = test(env)
             test_scores.append(test_score)
             print("Test result: %.2f" %test_score, "Average test result: %.2f" %np.mean(test_scores[-100:]))

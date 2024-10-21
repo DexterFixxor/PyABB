@@ -24,12 +24,12 @@ class IRBReachEnv(gym.Env):
         
         
         
-        self.delta_distance = 0.2
+        self.delta_distance = 0.1
         # definises cilj (goal), random sample u nekom prostoru
-        self.goal = np.concatenate([np.random.normal(0.7,0.1,1),np.random.normal(0.,0.3,1),np.array([0.]),np.array([0,1,0,0])])
+        self.goal = np.concatenate([np.random.normal(0.7,0.05,1),np.random.normal(0.,0.1,1),np.array([0.])],dtype=np.float64)
 
         self.point =   self.client.addUserDebugPoints(
-                                    pointPositions=[self.goal[:3]],
+                                    pointPositions=[self.goal],
                                     pointColorsRGB = [[1.0, 1.0, 0.0]],
                                     pointSize=10
                                     )
@@ -37,12 +37,11 @@ class IRBReachEnv(gym.Env):
 
 
         
-    def reward(self, state,goal = None):
-        if goal == None:
-            goal = self.goal
+    def reward(self, state,goal):
         
         
-        distance = np.linalg.norm(goal[:3]-state[:3], axis = -1)
+        
+        distance = np.linalg.norm(goal-state, axis = -1)
         return np.array([(distance < self.delta_distance) - 1])
 
     def step(self,state, action : np.ndarray):
@@ -50,14 +49,15 @@ class IRBReachEnv(gym.Env):
             action = np.array(action)
         
         self.robot.step(action)
-        for i in range(8):
+        for i in range(10):
             self.client.stepSimulation()
         self.robot._update_states()
         
-        next_state = np.concatenate([self.robot._ee_position, self.robot._ee_orientation])
-        reward = self.reward(state)
+        next_state = self.robot._ee_position
+        reward = self.reward(state,self.goal)
         
         done = reward.copy()
+        done = np.add(done,1)
         
         return reward, done, next_state, self.goal
         #return np.array of next_state, goal, reward, done
@@ -85,7 +85,7 @@ class IRBReachEnv(gym.Env):
         #pointSize=10
         #)
         
-        return np.concatenate([self.robot._ee_position, self.robot._ee_orientation])
+        return self.robot._ee_position
         
         
         
