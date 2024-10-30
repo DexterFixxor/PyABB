@@ -171,7 +171,7 @@ class Agent(object):
         #self.target_value = ValueNetwork(self.input_dims,self.n_actions,fc1_dim,fc2_dim,lr_value)
 #   
         self.update_network_params(1)
-        self.memory = HERBuffer(0.0,self.batch_size,max_size)
+        self.memory = HERBuffer(0.5,self.batch_size,max_size)
         
     def update_network_params(self, tau= None):
         if tau is None:
@@ -183,48 +183,33 @@ class Agent(object):
             target_param.data.copy_(tau*eval_param + (1.0-tau)*target_param.data)
             
 
-    def learn(self):
+    def learn(self,batch):
 
-        if len(self.memory.states) < self.batch_size:
+        if len(self.memory.buffer.state_memory) < self.batch_size:
             return
-        states, actions, rewards, next_states, dones, _ = self.memory.sample()[0]
+        states, actions, rewards, next_states, dones, goals = batch
 
         states = torch.tensor(states, dtype= torch.float32).to(self.actor.device)
         actions= torch.tensor(actions, dtype= torch.float32).to(self.actor.device)
         rewards = torch.tensor(rewards, dtype= torch.float32).to(self.actor.device).squeeze()
         next_states = torch.tensor(next_states, dtype= torch.float32).to(self.actor.device)
         dones = torch.tensor(dones, dtype= torch.int).to(self.actor.device).squeeze()
-
-        #-------Value network update-------#
-        """
-        self.value.optimizer.zero_grad()
-        values = self.value.forward(states).view(-1)
-        with torch.no_grad():
-            new_actions, log_probs = self.actor.sample(states,reparametrization=False)
-            log_probs = log_probs.view(-1)
-            critic_values_1 = self.critic_1.forward(states,new_actions)
-            critic_values_2 = self.critic_2.forward(states,new_actions)
-
-            critic_values = torch.min(critic_values_1,critic_values_2).squeeze()
-            values_target = critic_values - log_probs
-        value_loss = 0.5* F.mse_loss(values,values_target)
-        value_loss.backward(retain_graph=True)
-        self.value.optimizer.step()
-        """         
+        goals = torch.tensor(goals, dtype= torch.float32).to(self.actor.device)
        
-        
+        obs = torch.concat((states,goals),dim=1)
+        obs_ = torch.concat((next_states,goals),dim=1)
 
         #-------Critic networks update-------#
 
-        old_critic_values_1 = self.critic_1.forward(states,actions).squeeze()
-        old_critic_values_2 = self.critic_2.forward(states,actions).squeeze()
+        old_critic_values_1 = self.critic_1.forward(obs,actions).squeeze()
+        old_critic_values_2 = self.critic_2.forward(obs,actions).squeeze()
         with torch.no_grad():
-            new_actions, log_probs = self.actor.sample(next_states,reparametrization=False)
+            new_actions, log_probs = self.actor.sample(obs_,reparametrization=False)
             log_probs = log_probs.view(-1)
 
 
-            target_values_next_states_1 = self.target_critic_1.forward(next_states,new_actions).squeeze()
-            target_values_next_states_2 = self.target_critic_2.forward(next_states,new_actions).squeeze() 
+            target_values_next_states_1 = self.target_critic_1.forward(obs_,new_actions).squeeze()
+            target_values_next_states_2 = self.target_critic_2.forward(obs_,new_actions).squeeze() 
             target_values_next_states = torch.min(target_values_next_states_1,target_values_next_states_2)  - self.temperature* log_probs
             #target_values_next_states_1[dones] = 0
             q_hat = rewards +self.gamma*(1-dones)*target_values_next_states # might have to make (1-dones) tensor
@@ -245,10 +230,10 @@ class Agent(object):
         self.critic_2.optimizer.step()
 
         #-------Actor network update-------#
-        new_actions, log_probs = self.actor.sample(states,reparametrization=True)
+        new_actions, log_probs = self.actor.sample(obs,reparametrization=True)
 
-        critic_values_1 = self.critic_1.forward(states,new_actions)
-        critic_values_2 = self.critic_2.forward(states,new_actions)
+        critic_values_1 = self.critic_1.forward(obs,new_actions)
+        critic_values_2 = self.critic_2.forward(obs,new_actions)
         critic_values = torch.min(critic_values_1,critic_values_2).squeeze()
 
         
@@ -263,7 +248,7 @@ class Agent(object):
 
         #-------Temperature network update-------#
         self.temperature = torch.exp(self.log_temperature)
-        new_actions, log_probs = self.actor.sample(states,reparametrization=False)
+        new_actions, log_probs = self.actor.sample(obs,reparametrization=False)
         with torch.no_grad():
             loss = log_probs + self.target_entropy
 
@@ -294,7 +279,7 @@ input_dims = env.observation_space.shape[0]
 n_actions = env.action_space.shape[0]
 lr_actor = 0.001
 lr_critic = 0.001
-lr_value = 0.001
+
 max_episodes = 10000
 
 agent = Agent(lr_actor,lr_critic,input_dims,n_actions,env,max_action,reward_scale=2)
@@ -361,4 +346,4 @@ def train():
 
     print("gotov")
             
-train()
+#train()

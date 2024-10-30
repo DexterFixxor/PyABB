@@ -24,7 +24,7 @@ class IRBReachEnv(gym.Env):
         
         
         
-        self.delta_distance = 0.1
+        self.delta_distance = 0.05
         # definises cilj (goal), random sample u nekom prostoru
         self.goal = np.concatenate([np.random.normal(0.7,0.05,1),np.random.normal(0.,0.1,1),np.array([0.])],dtype=np.float64)
 
@@ -39,10 +39,13 @@ class IRBReachEnv(gym.Env):
         
     def reward(self, state,goal):
         
-        
-        
+  
         distance = np.linalg.norm(goal-state, axis = -1)
+        
+      
+
         return np.array([(distance < self.delta_distance) - 1])
+    
 
     def step(self,state, action : np.ndarray):
         if type(action) is not np.ndarray:
@@ -58,8 +61,9 @@ class IRBReachEnv(gym.Env):
         
         done = reward.copy()
         done = np.add(done,1)
+        #done = self.check_if_done(next_state,self.goal)
         
-        return reward, done, next_state, self.goal
+        return  next_state, reward, done, self.goal
         #return np.array of next_state, goal, reward, done
         # jos bolje tensor
         #return torch.Tensor of next_state, goal, reward, done

@@ -10,6 +10,7 @@ from REM_implementation import reward_func
 import random
 from buffer import HERBuffer
 from tqdm import tqdm, trange
+import SAC_with_temperature
 
 
 from src.pybullet_gym.envs.irb_env import IRBReachEnv
@@ -30,14 +31,14 @@ def test(env):
     state = env.reset()
     score = 0
     time_step = 0
-    agent.actor.eval()
+    sac_agent.actor.eval()
     
     while time_step <episode_length:
         obs = np.concatenate([state,env.goal], axis=-1,dtype=np.float32)
         
-        obs = torch.from_numpy(obs).to(agent.actor.device)
+        obs = torch.from_numpy(obs).to(sac_agent.actor.device)
         
-        mu_v,var_v = agent.target_actor(obs)
+        mu_v,var_v = sac_agent.target_actor(obs)
         action = torch.distributions.Normal(loc= mu_v, scale= var_v).sample().detach().numpy()
         action[-1] = 1
         
@@ -49,7 +50,7 @@ def test(env):
         score += reward
         time_step +=1
         
-    agent.actor.train()
+    sac_agent.actor.train()
     return score
 
 
@@ -131,16 +132,71 @@ if __name__ == "__main__":
     input_dims_critic = 6
     n_actions = 8
     memory_buffer = HERBuffer()
+    lr_actor = 0.001
+    lr_critic = 0.001
+    input_dims = 6
+    max_action = 1
     
-    agent = ddpg.Agent(lr_actor=0.001, lr_critic = 0.001, input_dims_actor=input_dims_actor, input_dims_critic = input_dims_critic, tau = .05,
-                       n_actions= n_actions,buffer= memory_buffer , layer1_size= 64, layer2_size=64, batch_size=128)
+    #agent = ddpg.Agent(lr_actor=0.001, lr_critic = 0.001, input_dims_actor=input_dims_actor, input_dims_critic = input_dims_critic, tau = .05,
+    #                   n_actions= n_actions,buffer= memory_buffer , layer1_size= 64, layer2_size=64, batch_size=128)
     
-    num_of_episodes = 100000
+    sac_agent = SAC_with_temperature.Agent(lr_actor,lr_critic,input_dims,n_actions,env,max_action,reward_scale=2)
+
+
+    num_of_episodes = 10000
     scores = []
     test_scores = []
     episode_length = 100
     
-    
+    for episode in trange(num_of_episodes):
+
+        time_step = 0
+        score = 0
+        done = False
+        state = env.reset()
+        
+
+        while not done and time_step < episode_length:
+            
+            obs = np.concatenate([state,env.goal], axis=-1)
+
+            if episode < 10:
+                action =np.random.uniform(low = -1., high= 1., size=(n_actions,))
+            else:
+                action = sac_agent.choose_action(obs)
+            action[-1] = 1
+
+            next_state, reward, done, goal = env.step(state,action)
+            sac_agent.memory.push(state,action,reward,done,next_state,goal)
+            if episode > 10:
+                buffer_sample, her_buffer_sample = sac_agent.memory.sample()
+                sac_agent.learn(buffer_sample)
+                sac_agent.learn(her_buffer_sample)
+            
+            score += reward
+            state = next_state
+            time_step+=1
+        her_goal = state
+       
+        
+        states = np.array(sac_agent.memory.states)
+        actions = np.array(sac_agent.memory.actions)
+        next_states = np.array(sac_agent.memory.next_states)
+        her_rewards = env.reward(sac_agent.memory.states,her_goal)
+        her_rewards = np.reshape(her_rewards,(time_step,1))
+        dones = her_rewards.copy()
+        dones = np.add(dones,1)
+        #dones = env.check_if_done(sac_agent.memory.states,her_goal)
+        #dones = np.reshape(dones,(time_step,1))
+        sac_agent.memory.her_buffer.append(states,actions, her_rewards,next_states, dones,[her_goal]*time_step)
+        #for i in range(5)
+
+
+        scores.append(score)
+        print("episode" , episode, "score %.2f" % score, "100 game average %.2f" % np.mean(scores[-100:]))
+        sac_agent.memory.reset_episode()
+
+    """
     for index in trange(num_of_episodes):
       
        
@@ -155,7 +211,7 @@ if __name__ == "__main__":
             action = agent.choose_action(obs,0).detach().numpy()
             action[-1] = 1
           
-            reward, done, next_state, goal = env.step(state,action)
+            next_state, reward, done , goal = env.step(state,action)
             
             agent.memory.push(state,action,reward, done,next_state, goal)
             state = next_state
@@ -216,7 +272,7 @@ if __name__ == "__main__":
         #elif index >1500 and index <2000:
         #    target_pos = np.array([0.712, 0.4, 0.1])
         #print(scores)
-
+    """
 
 
     
