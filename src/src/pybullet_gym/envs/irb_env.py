@@ -24,7 +24,8 @@ class IRBReachEnv(gym.Env):
         
         
         
-        self.delta_distance = 0.05
+        self.delta_distance = np.linspace(0.3,0.01,10000)
+        self.episode_index = 0
         # definises cilj (goal), random sample u nekom prostoru
         self.goal = np.concatenate([np.random.normal(0.7,0.05,1),np.random.normal(0.,0.1,1),np.array([0.])],dtype=np.float64)
 
@@ -44,7 +45,7 @@ class IRBReachEnv(gym.Env):
         
       
 
-        return np.array([(distance < self.delta_distance) - 1])
+        return np.array([(distance < self.delta_distance[self.episode_index]) - 1])
     
 
     def step(self,state, action : np.ndarray):

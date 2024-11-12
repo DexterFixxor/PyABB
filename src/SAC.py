@@ -151,7 +151,7 @@ class Agent(object):
         self.critic_2 = CriticNetwork(self.input_dims,self.n_actions,fc1_dim, fc2_dim,lr_critic)
         self.value = ValueNetwork(self.input_dims,self.n_actions,fc1_dim,fc2_dim,lr_value)
         self.target_value = ValueNetwork(self.input_dims,self.n_actions,fc1_dim,fc2_dim,lr_value)
-
+#   
         self.update_network_params(1)
         self.memory = HERBuffer(0.0,self.batch_size,max_size)
         
@@ -255,7 +255,7 @@ env.reset()
 env_test.reset()
 
 def test():
-    #time.sleep(2)
+    
     done = False
     trunc = False
     state = env_test.reset()[0]
@@ -299,14 +299,14 @@ def train():
         scores.append(score)
         print("episode" , episode, "score %.2f" % score, "100 game average %.2f" % np.mean(scores[-100:]))
             
-        if episode % 10 == 0:
-            test_score = test()
-            test_scores.append(test_score)
-            print("test number", int(episode/10), "score %.2f" % test_score, "100 test average %.2f" % np.mean(test_scores[-100:]))
+        # if episode % 10 == 0:
+        #     test_score = test()
+        #     test_scores.append(test_score)
+        #     print("test number", int(episode/10), "score %.2f" % test_score, "100 test average %.2f" % np.mean(test_scores[-100:]))
     
-    for i in range(10):
-        test()
-        time.sleep(1)
+    # for i in range(10):
+    #     test()
+    #     time.sleep(1)
 
 
     plt.plot(scores)

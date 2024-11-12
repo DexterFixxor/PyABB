@@ -143,7 +143,7 @@ if __name__ == "__main__":
     sac_agent = SAC_with_temperature.Agent(lr_actor,lr_critic,input_dims,n_actions,env,max_action,reward_scale=2)
 
 
-    num_of_episodes = 10000
+    num_of_episodes = 5
     scores = []
     test_scores = []
     episode_length = 100
@@ -176,6 +176,8 @@ if __name__ == "__main__":
             score += reward
             state = next_state
             time_step+=1
+
+        env.episode_index = episode
         her_goal = state
        
         

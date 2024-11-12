@@ -43,7 +43,7 @@ class IRB1402FGripperInterface:
     def _update_states(self):
         self._joint_positions, self._joint_velocities, _ = self._robotInterface.getJointStates()
         gripper_angles, _, _ = self._gripper_interface.getJointStates()
-        self._gripper_state = gripper_angles[0] / self._gripper_interface.joint_ranges[0] # normalize gripper state
+        self._gripper_state = gripper_angles[0] / (self._gripper_interface.joint_ranges[0] + 1e-5) # normalize gripper state
         self._ee_position, self._ee_orientation = self._robotInterface.calculateDrectKinematics(self._joint_positions)
     
     def _set_ee_pose(self, position : np.ndarray, orientation : np.ndarray):
