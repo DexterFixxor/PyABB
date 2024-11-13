@@ -5,7 +5,7 @@ from collections import deque
 
 class HERBuffer():
 
-    def __init__(self, odnos = 0.5, batch_size = 128, buffer_len = int(1e6)):
+    def __init__(self, odnos = 0.5, batch_size = 256, buffer_len = int(1e6)):
 
         self.her_batch = int(odnos * batch_size)
         self.batch = int((1-odnos) * batch_size)
@@ -25,7 +25,7 @@ class HERBuffer():
 
 
     def push(self, *transition):       # ----------------------------zbog čega "*" ???
-        state,action, reward, done, next_state, goal = transition
+        state,action, reward,next_state, done,  goal = transition
         
         self.states.append(state)
         self.actions.append(action)

@@ -154,7 +154,7 @@ class Agent(object):
         self.max_action = max_action
 
         self.target_entropy = - self.n_actions
-        self.temperature = 1
+        self.temperature = 0.2
         self.log_temperature = torch.tensor([0.0], requires_grad=True)
 
         
@@ -202,32 +202,32 @@ class Agent(object):
         #-------Critic networks update-------#
 
         old_critic_values_1 = self.critic_1.forward(obs,actions).squeeze()
-        old_critic_values_2 = self.critic_2.forward(obs,actions).squeeze()
+        #old_critic_values_2 = self.critic_2.forward(obs,actions).squeeze()
         with torch.no_grad():
             new_actions, log_probs = self.actor.sample(obs_,reparametrization=False)
             log_probs = log_probs.view(-1)
 
 
             target_values_next_states_1 = self.target_critic_1.forward(obs_,new_actions).squeeze()
-            target_values_next_states_2 = self.target_critic_2.forward(obs_,new_actions).squeeze() 
-            target_values_next_states = torch.min(target_values_next_states_1,target_values_next_states_2)  - self.temperature* log_probs
+            #target_values_next_states_2 = self.target_critic_2.forward(obs_,new_actions).squeeze() 
+            #target_values_next_states = torch.min(target_values_next_states_1,target_values_next_states_2)  - self.temperature* log_probs
             #target_values_next_states_1[dones] = 0
-            q_hat = rewards +self.gamma*(1-dones)*target_values_next_states # might have to make (1-dones) tensor
+            q_hat = rewards +self.gamma*(1-dones)*target_values_next_states_1 # might have to make (1-dones) tensor
             #skloni gradijent sa q_hat
 
 
         self.critic_1.optimizer.zero_grad()
-        self.critic_2.optimizer.zero_grad()
+        #self.critic_2.optimizer.zero_grad()
 
         #proveri koji gradijent se koristi
-        critic_loss_1 = 0.5 * F.mse_loss(old_critic_values_1,q_hat)
-        critic_loss_2 = 0.5 * F.mse_loss(old_critic_values_2,q_hat)
+        critic_loss_1 = F.mse_loss(old_critic_values_1,q_hat) # *0.5 
+        #critic_loss_2 = 0.5 * F.mse_loss(old_critic_values_2,q_hat)
 
-        critic_loss = critic_loss_1 + critic_loss_2
+        critic_loss = critic_loss_1 #+ critic_loss_2
         critic_loss.backward()
 
         self.critic_1.optimizer.step()
-        self.critic_2.optimizer.step()
+        #self.critic_2.optimizer.step()
 
         #-------Actor network update-------#
         new_actions, log_probs = self.actor.sample(obs,reparametrization=True)
@@ -269,81 +269,11 @@ class Agent(object):
 
         return actions.cpu().detach().numpy()[0]
 
-     
-env_name = 'Hopper-v5'
-
-env = gym.make(env_name)
-env_test = gym.make(env_name,render_mode = "human")
-max_action = env.action_space.high
-input_dims = env.observation_space.shape[0]
-n_actions = env.action_space.shape[0]
-lr_actor = 0.001
-lr_critic = 0.001
-
-max_episodes = 10000
-
-agent = Agent(lr_actor,lr_critic,input_dims,n_actions,env,max_action,reward_scale=2)
-env.reset()
-#env_test.reset()
-
-def test():
-    
-    done = False
-    trunc = False
-    state = env_test.reset()[0]
-    time_step = 0
-    score = 0
-    while not done and not trunc:
-        action = agent.choose_action(state)
-        next_state, reward, done, trunc, _ = env_test.step(action)
-        state = next_state
-        score += reward
-        time_step+=1
-        time.sleep(1/60)
-    
-    return score
-    
-
-def train():
-    scores = []
-    test_scores = []
-    for episode in trange(max_episodes):
-        state = env.reset()[0]
-        done = False
-        trunc = False
-        time_step = 0
+def reward(state,goal):
         
-        score = 0
-        while not done and not trunc:
+        
+        distance = np.linalg.norm(goal-state, axis = -1)
+        
+      
 
-            action = agent.choose_action(state)
-            next_state, reward, done, trunc, _ = env.step(action)
-
-            score += reward
-            agent.memory.push(state, action, reward, int(done), next_state, 1)
-
-            agent.learn()
-
-
-            state = next_state
-            
-            time_step+=1
-        scores.append(score)
-        print("episode" , episode, "score %.2f" % score, "100 game average %.2f" % np.mean(scores[-100:]))
-            
-        # if episode % 10 == 0:
-        #     test_score = test()
-        #     test_scores.append(test_score)
-        #     print("test number", int(episode/10), "score %.2f" % test_score, "100 test average %.2f" % np.mean(test_scores[-100:]))
-    
-    # for i in range(10):
-    #     test()
-    #     time.sleep(1)
-
-
-    plt.plot(scores)
-    plt.show()
-
-    print("gotov")
-            
-#train()
+        return np.array([(distance < 0.05) - 1])
