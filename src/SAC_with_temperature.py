@@ -16,7 +16,7 @@ from tqdm import tqdm, trange
 #https://arxiv.org/pdf/1812.05905 - SAC with automatic entropy adjustment
 
 
-
+DEVICE = 'cpu'
 
 class CriticNetwork(nn.Module):
     def __init__(self,input_dims, n_actions, fc1_dims, fc2_dims, lr_critic):
@@ -39,7 +39,8 @@ class CriticNetwork(nn.Module):
         self.q = nn.Linear(self.fc2_dims,1)
 
         self.optimizer = optim.Adam(self.parameters(),lr=lr_critic)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(DEVICE if torch.cuda.is_available() else 'cpu')
+        self.to(self.device)
 
     def forward(self,state,action):
         action_value = self.fc1(torch.cat((state,action), dim=1))
@@ -105,7 +106,8 @@ class ActorNetwork(nn.Module):
         self.var = nn.Linear(self.fc2_dims,self.n_actions)
             
         self.optimizer = optim.Adam(self.parameters(),lr=lr_actor)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(DEVICE if torch.cuda.is_available() else 'cpu')
+        self.to(self.device)
         
         
     def forward(self,state):
@@ -153,20 +155,21 @@ class Agent(object):
         self.tau = tau
         self.max_action = max_action
 
-        self.target_entropy = - self.n_actions
-        self.temperature = 0.2
-        self.log_temperature = torch.tensor([0.0], requires_grad=True)
-
-        
-        self.temperature_optimizer = optim.Adam(params=[self.log_temperature],lr=lr_actor)
-
-
 
         self.actor = ActorNetwork(self.input_dims,self.n_actions,self.max_action, fc1_dim,fc2_dim,lr_actor)
         self.critic_1 = CriticNetwork(self.input_dims,self.n_actions,fc1_dim, fc2_dim,lr_critic)
         self.target_critic_1 = CriticNetwork(self.input_dims,self.n_actions,fc1_dim, fc2_dim,lr_critic)
         self.critic_2 = CriticNetwork(self.input_dims,self.n_actions,fc1_dim, fc2_dim,lr_critic)
         self.target_critic_2 = CriticNetwork(self.input_dims,self.n_actions,fc1_dim, fc2_dim,lr_critic)
+
+
+        self.target_entropy = - self.n_actions
+        self.temperature = 0.2
+        self.log_temperature = torch.tensor([0.0], requires_grad=True, device= DEVICE)
+        self.temperature_optimizer = optim.Adam(params=[self.log_temperature],lr=lr_actor)
+
+
+
         #self.value = ValueNetwork(self.input_dims,self.n_actions,fc1_dim,fc2_dim,lr_value)
         #self.target_value = ValueNetwork(self.input_dims,self.n_actions,fc1_dim,fc2_dim,lr_value)
 #   
@@ -212,7 +215,7 @@ class Agent(object):
             #target_values_next_states_2 = self.target_critic_2.forward(obs_,new_actions).squeeze() 
             #target_values_next_states = torch.min(target_values_next_states_1,target_values_next_states_2)  - self.temperature* log_probs
             #target_values_next_states_1[dones] = 0
-            q_hat = rewards +self.gamma*(1-dones)*target_values_next_states_1 # might have to make (1-dones) tensor
+            q_hat = rewards +self.gamma*(1-dones)*(target_values_next_states_1 - self.temperature* log_probs) # target_values_next_states and without temp*log_probs if 2 critics
             #skloni gradijent sa q_hat
 
 
@@ -233,15 +236,15 @@ class Agent(object):
         new_actions, log_probs = self.actor.sample(obs,reparametrization=True)
 
         critic_values_1 = self.critic_1.forward(obs,new_actions)
-        critic_values_2 = self.critic_2.forward(obs,new_actions)
-        critic_values = torch.min(critic_values_1,critic_values_2).squeeze()
+        #critic_values_2 = self.critic_2.forward(obs,new_actions)
+        #critic_values = torch.min(critic_values_1,critic_values_2).squeeze()
 
         
         log_probs_temp = self.temperature * log_probs
         
 
         self.actor.optimizer.zero_grad()
-        actor_loss = log_probs_temp - critic_values
+        actor_loss = log_probs_temp - critic_values_1 # critic_value if using 2 critics
         actor_loss = torch.mean(actor_loss)
         actor_loss.backward(retain_graph=True)
         self.actor.optimizer.step()
